@@ -1,18 +1,36 @@
-
 <div class="delivery-check-box">
-<input type="text" id="pincheck" placeholder="Enter delivery pincode"/>
-<button id="checkpinbtn">Check Availability</button>
-<div id="delivery-result"></div>
+    <input type="text" id="pincheck" placeholder="Enter delivery pincode" maxlength="6" />
+    <button type="button" id="checkpinbtn">Check Availability</button>
+    <div id="delivery-result"></div>
 </div>
 
 <script>
-require(['jquery'],function($){
-$('#checkpinbtn').click(function(){
-var pin=$('#pincheck').val();
-$('#delivery-result').html('Checking delivery...');
-$.post('<?= $block->escapeUrl($block->getUrl("checkdelivery/ajax/check")) ?>',{pincode:pin},function(res){
-$('#delivery-result').html(res.message);
-});
-});
+require(['jquery'], function ($) {
+    var checkButton = $('#checkpinbtn');
+    var pinInput = $('#pincheck');
+    var result = $('#delivery-result');
+
+    checkButton.on('click', function () {
+        var pin = $.trim(pinInput.val());
+
+        if (!/^\d{6}$/.test(pin)) {
+            result.text('Please enter a valid 6-digit pincode.');
+            return;
+        }
+
+        result.text('Checking delivery...');
+        checkButton.prop('disabled', true);
+
+        $.post('<?= $block->escapeUrl($block->getUrl("checkdelivery/ajax/check")) ?>', {pincode: pin})
+            .done(function (response) {
+                result.text(response.message || 'Unable to check delivery right now.');
+            })
+            .fail(function () {
+                result.text('Unable to check delivery right now.');
+            })
+            .always(function () {
+                checkButton.prop('disabled', false);
+            });
+    });
 });
 </script>
