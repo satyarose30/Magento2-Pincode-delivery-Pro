@@ -1,0 +1,10 @@
+{
+"name":"magearray/module-checkdelivery-pro",
+"description":"Delivery Restriction Pro with OpenSearch lookup",
+"type":"magento2-module",
+"version":"7.0.0",
+"autoload":{
+"files":["registration.php"],
+"psr-4":{"MageArray\\CheckDelivery\\":""}
+}
+}
