@@ -1,44 +1,50 @@
 <?php
+declare(strict_types=1);
+
 namespace MageArray\CheckDelivery\Controller\Ajax;
 
+use MageArray\CheckDelivery\Model\OpenSearchLookup;
 use Magento\Framework\App\Action\Action;
 use Magento\Framework\App\Action\Context;
+use Magento\Framework\Controller\Result\Json;
 use Magento\Framework\Controller\Result\JsonFactory;
-use MageArray\CheckDelivery\Model\OpenSearchLookup;
 
-class Check extends Action{
+class Check extends Action
+{
+    private const INVALID_PINCODE_MESSAGE = 'Please enter a valid 6-digit pincode.';
+    private const UNAVAILABLE_MESSAGE = 'Delivery not available for this pincode.';
 
-protected $jsonFactory;
-protected $lookup;
+    private JsonFactory $jsonFactory;
+    private OpenSearchLookup $lookup;
 
-public function __construct(
-Context $context,
-JsonFactory $jsonFactory,
-OpenSearchLookup $lookup
-){
-parent::__construct($context);
-$this->jsonFactory=$jsonFactory;
-$this->lookup=$lookup;
-}
+    public function __construct(
+        Context $context,
+        JsonFactory $jsonFactory,
+        OpenSearchLookup $lookup
+    ) {
+        parent::__construct($context);
+        $this->jsonFactory = $jsonFactory;
+        $this->lookup = $lookup;
+    }
 
-public function execute(){
+    public function execute(): Json
+    {
+        $result = $this->jsonFactory->create();
+        $pincode = trim((string) $this->getRequest()->getParam('pincode', ''));
 
-$result=$this->jsonFactory->create();
-$pincode=$this->getRequest()->getParam('pincode');
+        if (!preg_match('/^\d{6}$/', $pincode)) {
+            return $result->setData(['success' => false, 'message' => self::INVALID_PINCODE_MESSAGE]);
+        }
 
-if(!preg_match('/^[0-9]{6}$/',$pincode)){
-return $result->setData(['success'=>false,'message'=>'Invalid pincode']);
-}
+        $data = $this->lookup->checkPincode($pincode);
 
-$data=$this->lookup->checkPincode($pincode);
+        if (!is_array($data)) {
+            return $result->setData(['success' => false, 'message' => self::UNAVAILABLE_MESSAGE]);
+        }
 
-if(!$data){
-return $result->setData(['success'=>false,'message'=>'Delivery not available']);
-}
+        $deliveryDays = isset($data['delivery_days']) ? (string) $data['delivery_days'] : 'N/A';
+        $message = sprintf('Delivery available. Estimated %s days.', $deliveryDays);
 
-$msg="Delivery available. Estimated ".$data['delivery_days']." days.";
-
-return $result->setData(['success'=>true,'message'=>$msg]);
-
-}
+        return $result->setData(['success' => true, 'message' => $message]);
+    }
 }

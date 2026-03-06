@@ -1,30 +1,61 @@
 <?php
+declare(strict_types=1);
+
 namespace MageArray\CheckDelivery\Model;
 
+use Magento\Framework\Exception\LocalizedException;
 use Magento\Framework\HTTP\Client\Curl;
+use Psr\Log\LoggerInterface;
 
-class OpenSearchLookup{
+class OpenSearchLookup
+{
+    private const OPENSEARCH_URL = 'http://localhost:9200/pincode_index/_search';
+    private const REQUEST_TIMEOUT_SECONDS = 5;
 
-protected $curl;
+    private Curl $curl;
+    private LoggerInterface $logger;
 
-public function __construct(Curl $curl){
-$this->curl=$curl;
-}
+    public function __construct(Curl $curl, LoggerInterface $logger)
+    {
+        $this->curl = $curl;
+        $this->logger = $logger;
+    }
 
-public function checkPincode($pincode){
+    /**
+     * @return array<string, mixed>|false
+     */
+    public function checkPincode(string $pincode)
+    {
+        $query = [
+            'size' => 1,
+            'query' => [
+                'term' => [
+                    'pincode' => $pincode,
+                ],
+            ],
+        ];
 
-$url="http://localhost:9200/pincode_index/_search?q=pincode:".$pincode;
+        try {
+            $this->curl->setTimeout(self::REQUEST_TIMEOUT_SECONDS);
+            $this->curl->addHeader('Content-Type', 'application/json');
+            $this->curl->post(self::OPENSEARCH_URL, (string) json_encode($query));
+        } catch (LocalizedException $exception) {
+            $this->logger->warning(
+                sprintf('OpenSearch lookup failed for pincode %s: %s', $pincode, $exception->getMessage())
+            );
+            return false;
+        }
 
-$this->curl->get($url);
-$response=$this->curl->getBody();
+        if ($this->curl->getStatus() !== 200) {
+            return false;
+        }
 
-$data=json_decode($response,true);
+        $data = json_decode($this->curl->getBody(), true);
 
-if(isset($data['hits']['hits'][0])){
-return $data['hits']['hits'][0]['_source'];
-}
+        if (!is_array($data)) {
+            return false;
+        }
 
-return false;
-
-}
+        return $data['hits']['hits'][0]['_source'] ?? false;
+    }
 }
